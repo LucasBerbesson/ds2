@@ -21,7 +21,16 @@ days_off = ['2013-01-01', '2013-01-06', '2013-02-12', '2013-02-14', '2013-03-31'
  '2019-04-21', '2019-04-22', '2019-05-01', '2019-05-08', '2019-05-30', '2019-06-09', '2019-06-09',
  '2019-06-10', '2019-07-14', '2019-08-15', '2019-11-01', '2019-11-11', '2019-12-25', '2019-12-31']
 
-
+strikes = ['2013-01-13',
+ '2013-03-24',
+ '2013-05-26',
+ '2014-02-02',
+ '2014-10-05',
+ '2015-01-10',
+ '2015-01-11',
+ '2016-03-31',
+ '2016-06-14',
+ '2017-12-09']
 
 
 def is_day_off(date):
@@ -61,6 +70,7 @@ def get_data(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv=
     df1 = pd.merge(consumption,weather,on='Date',how="left")
     df2 = pd.merge(half_hours,df1,on='Date',how="left")
     df2.interpolate('linear',limit=4,inplace=True)
+    df2["Temp"] = df2["Temp"] - 273.15
     return df2.dropna()
 
 
@@ -87,8 +97,11 @@ def get_data_with_features(consumption_csv="./data/eco2mix_regional_cons_def.csv
     df = get_data(consumption_csv,weather_csv)
     df['is_day_off'] = df['Date'].apply(compute_day_off)
     df['conso_24_lag'] = df['Conso'].shift(48)
+    df['temp_24_lag'] = df['Temp'].shift(48)
     df['conso_7_days_lag'] = df['Conso'].shift(336)
     df['is_weekend'] = df['Date'].apply(is_weekend)
     df['day_of_week']=df['Date'].dt.weekday
+    df["temp_rolling_7_days"] = df["Temp"].rolling(window=336).mean()
+    df['month']=df['Date'].dt.month
     df.set_index("Date",inplace=True)
     return df.dropna()
