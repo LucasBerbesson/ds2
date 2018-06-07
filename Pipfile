@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pandas = "*"
+scikit-learn = "*"
+seaborn = "*"
+jupyterlab = "*"
+requests = "*"
+"beautifulsoup4" = "*"
+lxml = "*"
+plotly = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.6"

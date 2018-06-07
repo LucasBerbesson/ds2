@@ -48,6 +48,7 @@ def get_data(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv=
     A function to get consumption and weather data
     Do the wrangling
     And return a nice & compact dataframe
+    Temperatures are in °C
     
     """
     # consumptions
@@ -55,23 +56,22 @@ def get_data(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv=
     consumption.drop_duplicates(inplace=True,subset='Date - Heure')
     consumption.columns = ['Date', 'Conso']
     # half hours
-    start_date = consumption['Date'].min()
     dates = []
-    for i in range(90000):
-        start_date += timedelta(minutes=30)
-        dates.append(start_date)
-    half_hours = pd.DataFrame(dates,columns=['Date'])
+    date_range = pd.date_range(start=consumption['Date'].min(),end=consumption['Date'].max(),freq='30min')
+    half_hours = pd.DataFrame(date_range,columns=['Date'])
     # weather
     weather = pd.read_csv(weather_csv,usecols=['dt','temp'])
-    weather['dt'] = pd.to_datetime(weather['dt'],unit='s')
+    weather['dt'] = pd.to_datetime(weather['dt'],unit='s',utc=True)
     weather.columns = ['Date', 'Temp']
     weather.drop_duplicates(inplace=True,subset='Date')
+    weather['Date'] = weather['Date'].dt.tz_convert('Europe/Paris').dt.tz_localize(None)
     # Merging
     df1 = pd.merge(consumption,weather,on='Date',how="left")
     df2 = pd.merge(half_hours,df1,on='Date',how="left")
     df2.interpolate('linear',limit=4,inplace=True)
     df2["Temp"] = df2["Temp"] - 273.15
     return df2.dropna()
+
 
 
 def compute_day_off(date):
@@ -85,6 +85,23 @@ def is_weekend(date):
         return 1
     return 0
 
+def heating_degrees(temperature):
+    """
+    A heating degree day (HDD) is a measurement designed 
+    to quantify the demand for energy needed to heat a building. 
+    It is the number of degrees a temperature is below 18°C,
+    which is the temperature below which buildings need to be heated. 
+    """
+    return max(18-temperature,0)
+
+
+def cooling_degrees(temperature):
+    """
+    A cooling degree day (CDD) is a measurement designed 
+    to quantify the demand for energy needed to cool a building.
+    It is the number of degrees that a temperature is above 24°C,
+    """
+    return max(temperature-24,0)
 
 
 def get_data_with_features(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv="./data/meteo-paris.csv"):
@@ -99,9 +116,11 @@ def get_data_with_features(consumption_csv="./data/eco2mix_regional_cons_def.csv
     df['conso_24_lag'] = df['Conso'].shift(48)
     df['temp_24_lag'] = df['Temp'].shift(48)
     df['conso_7_days_lag'] = df['Conso'].shift(336)
+    df["heating_degrees"] = df["Temp"].apply(heating_degrees)
+    df["cooling_degrees"] = df["Temp"].apply(cooling_degrees)
     df['is_weekend'] = df['Date'].apply(is_weekend)
     df['day_of_week']=df['Date'].dt.weekday
     df["temp_rolling_7_days"] = df["Temp"].rolling(window=336).mean()
     df['month']=df['Date'].dt.month
-    df.set_index("Date",inplace=True)
+    #df.set_index("Date",inplace=True)
     return df.dropna()
