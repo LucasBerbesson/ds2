@@ -12,6 +12,8 @@ requests = "*"
 "beautifulsoup4" = "*"
 lxml = "*"
 plotly = "*"
+sklearn = "*"
+requests-html = "*"
 
 [dev-packages]
 
