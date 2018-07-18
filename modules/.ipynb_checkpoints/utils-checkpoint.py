@@ -52,26 +52,28 @@ def get_data(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv=
     
     """
     # consumptions
-    consumption =  pd.read_csv(consumption_csv, delimiter=";",parse_dates=["Date - Heure"], usecols = ["Date - Heure","Consommation (MW)"])
+    consumption =  pd.read_csv(consumption_csv, delimiter=";", usecols = ["Date - Heure","Consommation (MW)"])
+    consumption["Date - Heure"] = pd.to_datetime(consumption["Date - Heure"],utc=True)
+    consumption["Date - Heure"] = consumption["Date - Heure"].dt.tz_convert("Europe/Paris")
     consumption.drop_duplicates(inplace=True,subset='Date - Heure')
     consumption.columns = ['Date', 'Conso']
     # half hours
-    dates = []
     date_range = pd.date_range(start=consumption['Date'].min(),end=consumption['Date'].max(),freq='30min')
     half_hours = pd.DataFrame(date_range,columns=['Date'])
     # weather
     weather = pd.read_csv(weather_csv,usecols=['dt','temp'])
-    weather['dt'] = pd.to_datetime(weather['dt'],unit='s',utc=True)
     weather.columns = ['Date', 'Temp']
     weather.drop_duplicates(inplace=True,subset='Date')
-    weather['Date'] = weather['Date'].dt.tz_convert('Europe/Paris').dt.tz_localize(None)
+    weather['Date'] = pd.to_datetime(weather['Date'],unit='s',utc=True).dt.tz_convert('Europe/Paris')
     # Merging
     df1 = pd.merge(consumption,weather,on='Date',how="left")
+    df1["Temp"] = df1["Temp"] - 273.15
+    
+    date_range = pd.date_range(start=df1['Date'].min(),end=df1['Date'].max(),freq='30min')
+    half_hours = pd.DataFrame(date_range,columns=['Date'])
     df2 = pd.merge(half_hours,df1,on='Date',how="left")
     df2.interpolate('linear',limit=4,inplace=True)
-    df2["Temp"] = df2["Temp"] - 273.15
     return df2.dropna()
-
 
 
 def compute_day_off(date):
