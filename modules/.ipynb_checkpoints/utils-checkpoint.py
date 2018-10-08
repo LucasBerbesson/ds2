@@ -54,12 +54,10 @@ def get_data(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv=
     # consumptions
     consumption =  pd.read_csv(consumption_csv, delimiter=";", usecols = ["Date - Heure","Consommation (MW)"])
     consumption["Date - Heure"] = pd.to_datetime(consumption["Date - Heure"], utc=True).dt.tz_convert('Europe/Paris').dt.tz_localize(None)
-    consumption.drop_duplicates(inplace=True,subset='Date - Heure')
     consumption.columns = ['Date', 'Conso']
     # weather
     weather = pd.read_csv(weather_csv,usecols=['dt','temp'])
     weather.columns = ['Date', 'Temp']
-    weather.drop_duplicates(inplace=True,subset='Date')
     weather['Date'] = pd.to_datetime(weather['Date'],unit='s',utc=True).dt.tz_convert('Europe/Paris').dt.tz_localize(None)    
     # Merging
     df1 = pd.merge(consumption,weather,on='Date',how="left")
@@ -70,6 +68,7 @@ def get_data(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv=
     df2 = pd.merge(half_hours,df1,on='Date',how="left")
     #Interpolation
     df2.interpolate('linear',limit=4,inplace=True)
+    df2.drop_duplicates(inplace=True,subset='Date')
     return df2.dropna()
 
 
