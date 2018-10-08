@@ -53,33 +53,28 @@ def get_data(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv=
     """
     # consumptions
     consumption =  pd.read_csv(consumption_csv, delimiter=";", usecols = ["Date - Heure","Consommation (MW)"])
-    consumption["Date - Heure"] = pd.to_datetime(consumption["Date - Heure"],utc=True)
-    consumption["Date - Heure"] = consumption["Date - Heure"].dt.tz_convert("Europe/Paris")
+    consumption["Date - Heure"] = pd.to_datetime(consumption["Date - Heure"], utc=True).dt.tz_convert('Europe/Paris').dt.tz_localize(None)
     consumption.drop_duplicates(inplace=True,subset='Date - Heure')
     consumption.columns = ['Date', 'Conso']
-    # half hours
-    date_range = pd.date_range(start=consumption['Date'].min(),end=consumption['Date'].max(),freq='30min')
-    half_hours = pd.DataFrame(date_range,columns=['Date'])
     # weather
     weather = pd.read_csv(weather_csv,usecols=['dt','temp'])
     weather.columns = ['Date', 'Temp']
     weather.drop_duplicates(inplace=True,subset='Date')
-    weather['Date'] = pd.to_datetime(weather['Date'],unit='s',utc=True).dt.tz_convert('Europe/Paris')
+    weather['Date'] = pd.to_datetime(weather['Date'],unit='s',utc=True).dt.tz_convert('Europe/Paris').dt.tz_localize(None)    
     # Merging
     df1 = pd.merge(consumption,weather,on='Date',how="left")
     df1["Temp"] = df1["Temp"] - 273.15
-    
+    # Half hours
     date_range = pd.date_range(start=df1['Date'].min(),end=df1['Date'].max(),freq='30min')
     half_hours = pd.DataFrame(date_range,columns=['Date'])
     df2 = pd.merge(half_hours,df1,on='Date',how="left")
+    #Interpolation
     df2.interpolate('linear',limit=4,inplace=True)
     return df2.dropna()
 
 
-def compute_day_off(date):
-    if is_day_off(date):
-        return 1
-    return 0
+def is_day_off(date):
+    return int(date.strftime('%Y-%m-%D') in days_off)
 
 
 def is_weekend(date):
@@ -105,6 +100,19 @@ def cooling_degrees(temperature):
     """
     return max(temperature-24,0)
 
+from datetime import datetime, timedelta
+
+def is_bridge(date):
+    """
+    Check if a datetime is a holiday bridge 
+    (friday with thursday off or mondy with tuesday off)
+    """
+    weekday = date.weekday()
+    if weekday == 4:
+        return is_day_off(date-timedelta(days=1))
+    elif weekday == 0:
+        return is_day_off(date+timedelta(days=1))
+    return False
 
 def get_data_with_features(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv="./data/meteo-paris.csv"):
     """
@@ -114,15 +122,16 @@ def get_data_with_features(consumption_csv="./data/eco2mix_regional_cons_def.csv
     
     """
     df = get_data(consumption_csv,weather_csv)
-    df['is_day_off'] = df['Date'].apply(compute_day_off)
+    df['is_day_off'] = df['Date'].apply(is_day_off)
+    df['is_bridge'] = df['Date'].apply(is_bridge)
     df['conso_24_lag'] = df['Conso'].shift(48)
     df['temp_24_lag'] = df['Temp'].shift(48)
-    df['conso_7_days_lag'] = df['Conso'].shift(336)
+    df['conso_7_days_lag'] = df['Conso'].shift(48*7)
     df["heating_degrees"] = df["Temp"].apply(heating_degrees)
     df["cooling_degrees"] = df["Temp"].apply(cooling_degrees)
     df['is_weekend'] = df['Date'].apply(is_weekend)
     df['day_of_week']=df['Date'].dt.weekday
     df["temp_rolling_7_days"] = df["Temp"].rolling(window=336).mean()
     df['month']=df['Date'].dt.month
-    #df.set_index("Date",inplace=True)
+    df.set_index("Date",inplace=True)
     return df.dropna()
