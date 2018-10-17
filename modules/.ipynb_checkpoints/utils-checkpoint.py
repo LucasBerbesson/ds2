@@ -48,16 +48,21 @@ def get_data(consumption_csv="./data/eco2mix_regional_cons_def.csv",weather_csv=
     A function to get consumption and weather data
     Do the wrangling
     And return a nice & compact dataframe
-    Temperatures are in °C
+    Temperatures are in C
     
     """
     # consumptions
-    consumption =  pd.read_csv(consumption_csv, delimiter=";", usecols = ["Date - Heure","Consommation (MW)"])
-    consumption["Date - Heure"] = pd.to_datetime(consumption["Date - Heure"], utc=True).dt.tz_convert('Europe/Paris').dt.tz_localize(None)
+    consumption =  pd.read_csv(consumption_csv, delimiter=";", usecols = ["Date","Heure","Consommation (MW)"])
+    consumption["Date - Heure"] = consumption["Date"]+" - "+consumption["Heure"]
+    consumption["Date - Heure"] = pd.to_datetime(consumption["Date - Heure"], format="%Y-%m-%d - %H:%M")
+    consumption.drop(["Date","Heure"],axis=1,inplace=True)
     consumption.columns = ['Date', 'Conso']
     # weather
     weather = pd.read_csv(weather_csv,usecols=['dt','temp'])
     weather.columns = ['Date', 'Temp']
+    
+    
+    
     weather['Date'] = pd.to_datetime(weather['Date'],unit='s',utc=True).dt.tz_convert('Europe/Paris').dt.tz_localize(None)    
     # Merging
     df1 = pd.merge(consumption,weather,on='Date',how="left")
